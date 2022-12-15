@@ -1,0 +1,311 @@
+`timescale 1ns / 1ps
+
+module main(System_Clock, reset, command, Submit, bitInput, C, AN, DP, audioOut, aud_sd, startLED, doneLED);
+input System_Clock, reset, command, Submit;
+input [3:0] bitInput;
+output [3:0] startLED;
+output doneLED;
+output [6:0] C;
+output [7:0] AN;
+output DP;
+output audioOut;
+output wire aud_sd;
+wire outsignal;
+wire [3:0] y;
+wire enableaudio;
+parameter E = 1;
+//Allows for the 7 segments to display
+    assign AN[0] = 0;   //Turns on one seven segment display
+    assign AN[1] = 1;   //The rest should be turned off
+    assign AN[2] = 1;
+    assign AN[3] = 1;
+    assign AN[4] = 1;
+    assign AN[5] = 1;
+    assign AN[6] = 1;
+    assign AN[7] = 1;
+    assign DP = 1; //1 = Turns off display, 0 = Turns on display
+    assign aud_sd = 1'b1;
+    parameter D = 0;
+
+slowerClkGen myClock(System_Clock, D, outsignal);
+upcounter myCounter(reset, outsignal, command, y);
+seven_seg_decoder mySevenSeg(y, C);
+bitMatchingStates state(outsignal, reset, command, Submit, bitInput, y, startLED, doneLED, enableaudio);
+SongPlayer SubmitAudio(System_Clock, command, Submit, bitInput, audioOut, enableaudio);
+endmodule 
+
+module slowerClkGen(clk, command, outsignal); //Slow Clock Generator
+input clk;
+input command;
+output outsignal;
+reg [26:0] counter;  
+reg outsignal;
+    always @ (posedge clk)
+    begin
+        if (command)
+            begin
+                counter=0;
+                outsignal=0;
+            end
+        else
+            begin
+                counter = counter +1;
+        if (counter == 125_000) 
+            begin                   
+                outsignal=~outsignal;   
+                counter =0;             
+            end
+            end
+    end
+endmodule
+
+module upcounter (reset, Clock, E, Q); //3-bit counter
+input reset, Clock, E;
+output reg [3:0] Q;
+    always @(negedge reset, posedge Clock)
+        if (reset)
+            Q <= 0;
+        else if (E)
+            Q <= Q + 1;
+endmodule
+
+module seven_seg_decoder(y, C); //7 segment decoder values
+    input wire[3:0] y;
+    output reg [6:0] C;
+    
+        always@*                  //Obtained by truth table
+            case(y)
+                4'b0000: C = 7'b0000001;    //0
+                4'b0001: C = 7'b1001111;    //1
+                4'b0010: C = 7'b0010010;    //2
+                4'b0011: C = 7'b0000110;    //3
+                4'b0100: C = 7'b1001100;    //4
+                4'b0101: C = 7'b0100100;    //5
+                4'b0110: C = 7'b0100000;    //6
+                4'b0111: C = 7'b0001111;    //7
+                4'b1000: C = 7'b0000000;    //8
+                4'b1001: C = 7'b0000100;    //9
+                4'b1010: C = 7'b0001000;    //A
+                4'b1011: C = 7'b1100000;    //B
+                4'b1100: C = 7'b0110001;    //C
+                4'b1101: C = 7'b1000010;    //D
+                4'b1110: C = 7'b0110000;    //E
+                4'b1111: C = 7'b0111000;    //F
+                    default: C = 7'b0000001;    //default is set to 0
+            endcase
+endmodule
+
+module bitMatchingStates(Clock, reset, command, Submit, bitInput, y, startLED, doneLED, enableaudio);
+input Clock, reset, command, Submit;
+input [3:0] bitInput;
+input wire [3:0] y;
+output reg [3:0] startLED;
+output reg enableaudio;
+output reg doneLED;
+
+localparam [1:0] s1=2'd1, s2=2'd2, s3=2'd3;
+reg [1:0] state_reg, state_next;
+reg [3:0] reg_bitInput, reg_bitInput_next;
+reg [3:0] y_reg, y_next;
+reg [3:0] startNext;
+reg done_next;
+reg enableaudio_next;
+
+always @(posedge Clock, posedge reset)
+begin
+    if(reset)
+        begin
+            state_reg <= s1;
+            reg_bitInput <= 0;
+            startLED <= 4'b0000;
+            doneLED <= 0;
+            y_reg <= 0;
+            enableaudio <= 0;
+        end
+    else
+        begin
+            state_reg <= state_next;
+            reg_bitInput <= reg_bitInput_next;
+            startLED <= startNext;
+            doneLED <= done_next;
+            y_reg <= y_next;
+            enableaudio <= enableaudio_next;
+        end
+end
+always@*
+begin
+    state_next <= state_reg;
+    reg_bitInput_next <= reg_bitInput;
+    startNext <= startLED;
+    done_next <= doneLED;
+    y_next <= y_reg;
+    enableaudio_next <= enableaudio;
+case(state_reg)
+s1:
+    begin
+        if(command)
+            begin
+                startNext <= 4'b1111;
+                state_next <= s2;
+            end
+        else
+            begin
+                startNext <= 4'b0000;
+                done_next <= 0;
+                enableaudio_next <=0;
+            end
+    end
+s2:
+    begin
+        reg_bitInput_next <= bitInput;
+        y_next <= y;
+        if(Submit)
+            begin
+                if(reg_bitInput_next == y_next)
+                    begin
+                        enableaudio_next <= 1;
+                        state_next <= s3;
+                        startNext <= 4'b0000;
+                        done_next <= 1;
+                    end
+                else
+                    begin
+                        enableaudio_next <= 0;
+                    end
+            end
+    end
+s3:
+    begin
+    if(Submit == 0)
+    begin
+    done_next <= 0;
+    enableaudio_next <=0;
+    state_next <= s1;
+    end
+    end
+default:
+    begin
+        state_next <= s1;
+    end
+endcase
+end
+endmodule
+
+module MusicSheetCorrect( input [9:0] number, 
+	output reg [19:0] note,//max ? different musical notes
+	output reg [4:0] duration);
+
+parameter   QUARTER = 5'b00010;//1 beat
+parameter	HALF = 5'b00100;//2 beats
+parameter	WHOLE = 2* HALF;//4 beats
+parameter	TWO_WHOLE = 2* WHOLE;//8 beats
+parameter	FOUR_WHOLE = 2* TWO_WHOLE;//16 beats
+
+parameter   EIGHTH = 5'b00001;//0.5 beat
+
+parameter   SP = 1;  //Rest
+parameter   A3 = 113636, A4_sharp = 107296, B4 = 101214, C4 = 95602, C4_sharp = 90253, D4 = 85179, D4_sharp = 80386, E4 = 75872, F4 = 71633, F4_sharp = 67567, G4 = 63775, G4_sharp = 60240, A4 = 56818;
+parameter   B5 = 50607, C5 = 47801;
+
+always @ (number) begin
+case(number)
+
+0: begin note = C4; duration = QUARTER;   end
+1: begin note = D4; duration = QUARTER;   end
+2: begin note = E4; duration = QUARTER;   end
+3: begin note = F4; duration = QUARTER;   end
+4: begin note = G4; duration = QUARTER;   end
+5: begin note = A4; duration = QUARTER;   end
+6: begin note = B5; duration = QUARTER;   end
+7: begin note = C5; duration = QUARTER;   end
+8: begin note = SP; duration = QUARTER;   end
+
+default: 	begin note = SP; duration = QUARTER;  end
+endcase
+end
+endmodule
+
+module MusicSheetIncorrect( input [9:0] number, 
+	output reg [19:0] note,//max ? different musical notes
+	output reg [4:0] duration);
+
+parameter   QUARTER = 5'b00010;//1 beat
+parameter	HALF = 5'b00100;//2 beats
+parameter	WHOLE = 2* HALF;//4 beats
+parameter	TWO_WHOLE = 2* WHOLE;//8 beats
+parameter	FOUR_WHOLE = 2* TWO_WHOLE;//16 beats
+
+parameter   EIGHTH = 5'b00001;//0.5 beat
+
+parameter   SP = 1;  //Rest
+parameter   A3 = 113636, A4_sharp = 107296, B4 = 101214, C4 = 95602, C4_sharp = 90253, D4 = 85179, D4_sharp = 80386, E4 = 75872, F4 = 71633, F4_sharp = 67567, G4 = 63775, G4_sharp = 60240, A4 = 56818;
+parameter   B5 = 50607, C5 = 47801;
+
+always @ (number) begin
+case(number)
+
+0: begin note = C5; duration = QUARTER;   end
+1: begin note = B5; duration = QUARTER;   end
+2: begin note = A4; duration = QUARTER;   end
+3: begin note = G4; duration = QUARTER;   end
+4: begin note = F4; duration = QUARTER;   end
+5: begin note = E4; duration = QUARTER;   end
+6: begin note = D4; duration = QUARTER;   end
+7: begin note = C4; duration = QUARTER;   end
+8: begin note = SP; duration = QUARTER;   end
+
+default: 	begin note = SP; duration = QUARTER;  end
+endcase
+end
+endmodule
+
+module SongPlayer(clock, command, Submit, bitInput, audioOut, y);
+input clock;
+input [3:0] bitInput;
+input wire y;
+input wire Submit;
+input wire command;
+output reg audioOut;
+reg [19:0] counter;
+reg [31:0] time1, noteTime;
+reg [9:0] msec, number;	//millisecond counter, and sequence number of musical note.
+wire [4:0] note, duration;
+wire [19:0] notePeriod;
+parameter clockFrequency = 100_000_000; 
+
+MusicSheetCorrect 	myRsong(number, notePeriod, duration);
+
+always @ (posedge clock) 
+  begin
+	if(~y) 
+ 		begin 
+          counter <=0;  
+          time1<=0;  
+          number <=0;  
+          audioOut <=1;	
+     	end
+    else 
+    begin
+    if(y)
+        begin
+		  counter <= counter + 1; 
+          time1<= time1+1;
+		  if( counter >= notePeriod) 
+            begin
+			 counter <=0;  
+			 audioOut <= ~audioOut ; 
+            end	//toggle audio output 	
+		  if( time1 >= noteTime) 
+            begin	
+		      time1 <=0;  
+              number <= number + 1; 
+            end  //play next note
+    if(number == 8) number = 0; // Make the number reset at the end of the song
+	   end
+end
+end	
+         
+  always @(duration) noteTime = duration * clockFrequency / 8; 
+       //number of   FPGA clock periods in one note.
+endmodule
+
