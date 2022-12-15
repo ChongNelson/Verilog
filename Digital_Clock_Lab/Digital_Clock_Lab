@@ -1,1 +1,217 @@
+`timescale 1ns / 1ps
+module main(stopTime, Sys_Clk, C, AN1, AN2, DP); //LED);
+    input stopTime;
+    input Sys_Clk;
+    output [6:0] C;
+    output [3:0] AN1;
+    output [3:0] AN2;
+    //output [3:0] LED; //Testing values. Ignore this
+    output DP;
+    //assign AN1[0] = 0, AN1[1] = 0, AN1[2] = 0, AN1[3] = 0;
+    assign AN2[0] = 1, AN2[1] = 1, AN2[2] = 1, AN2[3] = 1;
+    assign DP = 1;
+    wire Outsignal_1;
+    wire Outsignal_400;
+    wire [5:0] sec;
+    wire [5:0] min;
+    wire [1:0] Q;
+    wire [6:0] D0;
+    wire [6:0] D1;
+    wire [6:0] D2;
+    wire [6:0] D3;
 
+    seven_seg_display my_display (sec, min, D0, D1, D2, D3);
+    mux4to1 myMux (D0, D1, D2, D3, Q, C);
+    ClkGen1Hz my_1Hzclock (Sys_Clk, stopTime, Outsignal_1);
+    //upcounter1Hz my_1Hzcounter (Outsignal1, S);
+    ClkGen400Hz my_400Hzclock (Sys_Clk, stopTime, Outsignal_400);
+    decoder2to4 my2to4decoder (Outsignal_400, Q, AN1);
+    countOneHour myOneHourCounter (Outsignal_1, sec, min);
+    //upcounter400Hz my_400Hzcounter (Outsignal2, Q, AN1);
+
+endmodule
+
+module ClkGen400Hz(clk, stopTime, outsignal);
+    input clk;
+    input stopTime;
+    output outsignal;
+    reg [26:0] counter;  
+    reg outsignal;
+    always @ (posedge clk)
+        begin
+	       if (stopTime)
+	           begin
+		          counter=0;
+		          outsignal=0;
+	           end
+	       else
+    begin
+	   counter = counter +1;
+	       if (counter == 125_000)
+		      begin
+			     outsignal=~outsignal;
+			     counter =0;
+		      end
+        end
+    end
+endmodule
+
+module decoder2to4 (Clock, Q, AN); 
+    input Clock;
+    output reg [1:0] Q;
+    output reg [3:0] AN;
+    always @(posedge Clock) 
+    begin
+    Q <= Q + 1;
+        if (Q == 2'b00)
+            begin
+                AN[0]=0; AN[1]=1; AN[2]=1; AN[3]=1;
+            end
+        if (Q == 2'b01)
+            begin
+                AN[0]=1; AN[1]=0; AN[2]=1; AN[3]=1;
+            end
+        if (Q == 2'b10)
+            begin
+                AN[0]=1; AN[1]=1; AN[2]=0; AN[3]=1;
+            end
+        if (Q == 2'b11)
+            begin
+                AN[0]=1; AN[1]=1; AN[2]=1; AN[3]=0;
+            end
+        else
+        Q = 2'b00;
+    end
+endmodule 
+
+module ClkGen1Hz(clk, stopTime, outsignal);
+    input clk;
+    input stopTime;
+    output outsignal;
+    reg [26:0] counter;  
+    reg outsignal;
+    always @ (posedge clk)
+        begin
+	       if (stopTime)
+	           begin
+		          counter=0;
+		          outsignal=0;
+	           end
+	       else
+    begin
+	   counter = counter +1;
+	       if (counter == 50_000_000)
+		      begin
+			     outsignal=~outsignal;
+			     counter = 0;
+		      end
+        end
+    end
+endmodule
+
+module countOneHour(Clock, seconds, minutes);//secondOnes, secondTens, minuteOnes, minuteTens);
+	input Clock;
+    output reg [5:0] seconds;
+    output reg [5:0] minutes;
+
+	always @(posedge Clock)
+	begin
+	   if(minutes == 6'd59)
+	       begin
+	           minutes <=0;
+           end
+       if(seconds == 6'd59)
+           begin
+               seconds <= 0;
+               minutes <= minutes + 1;
+           end
+       else
+           begin
+               seconds <= seconds + 1;
+           end
+	end
+endmodule
+
+module mux4to1 (Seg0, Seg1, Seg2, Seg3, S, f);
+    input [6:0] Seg0;
+    input [6:0] Seg1;
+    input [6:0] Seg2;
+    input [6:0] Seg3;
+    input [1:0] S;
+    output reg [6:0] f;
+    always @(Seg0, Seg1, Seg2, Seg3, S)
+        begin
+            if (S == 2'b00)
+                f <= Seg0;
+            else if (S == 2'b01)
+                f <= Seg1;
+            else if (S == 2'b10)
+                f <= Seg2;
+            else if (S == 2'b11)
+                f <= Seg3;
+        end
+endmodule
+        
+module seven_seg_display (sec, min, D0, D1, D2, D3);
+    input wire [5:0] sec;
+    input wire [5:0] min;
+    output reg [6:0] D0;
+    output reg [6:0] D1;
+    output reg [6:0] D2;
+    output reg [6:0] D3;
+    always@*
+        begin
+            case(min/6'd10)
+                6'd0: D0=7'b0000001; //0
+                6'd1: D0=7'b1001111; //1
+                6'd2: D0=7'b0010010; //2
+                6'd3: D0=7'b0000110; //3
+                6'd4: D0=7'b1001100; //4
+                6'd5: D0=7'b0100100; //5 
+                6'd6: D0=7'b0100000; //6
+                6'd7: D0=7'b0001111; //7
+                6'd8: D0=7'b0000000; //8
+                6'd9: D0=7'b0001100; //9
+                default: D0=7'b0000001; //default
+            endcase
+            case(sec%6'd10)
+                6'd0: D1=7'b0000001; //0
+                6'd1: D1=7'b1001111; //1
+                6'd2: D1=7'b0010010; //2
+                6'd3: D1=7'b0000110; //3
+                6'd4: D1=7'b1001100; //4
+                6'd5: D1=7'b0100100; //5 
+                6'd6: D1=7'b0100000; //6
+                6'd7: D1=7'b0001111; //7
+                6'd8: D1=7'b0000000; //8
+                6'd9: D1=7'b0001100; //9
+                default: D1=7'b0000001; //default
+            endcase
+            case(sec/6'd10)
+                6'd0: D2=7'b0000001; //0
+                6'd1: D2=7'b1001111; //1
+                6'd2: D2=7'b0010010; //2
+                6'd3: D2=7'b0000110; //3
+                6'd4: D2=7'b1001100; //4
+                6'd5: D2=7'b0100100; //5 
+                6'd6: D2=7'b0100000; //6
+                6'd7: D2=7'b0001111; //7
+                6'd8: D2=7'b0000000; //8
+                6'd9: D2=7'b0001100; //9
+                default: D2=7'b0000001; //default
+            endcase
+            case(min%6'd10)
+                6'd0: D3=7'b0000001; //0
+                6'd1: D3=7'b1001111; //1
+                6'd2: D3=7'b0010010; //2
+                6'd3: D3=7'b0000110; //3
+                6'd4: D3=7'b1001100; //4
+                6'd5: D3=7'b0100100; //5 
+                6'd6: D3=7'b0100000; //6
+                6'd7: D3=7'b0001111; //7
+                6'd8: D3=7'b0000000; //8
+                6'd9: D3=7'b0001100; //9
+                default: D3=7'b0000001; //default
+            endcase
+        end
+endmodule
