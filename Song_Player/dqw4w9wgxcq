@@ -1,0 +1,157 @@
+`timescale 1ns / 1ps
+
+module MusicSheet( input [9:0] number, 
+	output reg [19:0] note,//max ? different musical notes
+	output reg [4:0] duration);
+
+parameter   QUARTER = 5'b00010;//1 beat
+parameter	HALF = 5'b00100;//2 beats
+parameter	WHOLE = 2* HALF;//4 beats
+parameter	TWO_WHOLE = 2* WHOLE;//8 beats
+parameter	FOUR_WHOLE = 2* TWO_WHOLE;//16 beats
+
+parameter   EIGHTH = 5'b00001;//0.5 beat
+//parameter   SIXTEENTH = EIGHTH/2;//0.25 beat
+
+parameter   SP = 1;  //Rest
+parameter   A3 = 113636, A4_sharp = 107296, B4 = 101214, C4 = 95602, C4_sharp = 90253, D4 = 85179, D4_sharp = 80386, E4 = 75872, F4 = 71633, F4_sharp = 67567, G4 = 63775, G4_sharp = 60240, A4 = 56818;
+parameter   B5 = 50607, C5 = 47801;
+
+always @ (number) begin
+case(number) //Rickroll
+
+//0: begin note = C4; duration = SIXTEENTH;   end 
+//1: begin note = D4; duration = SIXTEENTH;   end 
+//2: begin note = E4; duration = SIXTEENTH;   end 
+//3: begin note = F4; duration = SIXTEENTH;   end 
+//4: begin note = G4; duration = SIXTEENTH;   end 
+//5: begin note = A4; duration = SIXTEENTH;   end 
+//6: begin note = B5; duration = SIXTEENTH;   end 
+//7: begin note = C5; duration = SIXTEENTH;   end 
+
+0: begin note = C4; duration = EIGHTH;   end //Nev-
+1: begin note = D4; duration = EIGHTH;   end //er
+2: begin note = F4; duration = EIGHTH;   end //gon-
+3: begin note = D4; duration = EIGHTH;   end //na
+
+4: begin note = A4; duration = QUARTER;   end //give
+5: begin note = SP; duration = EIGHTH;   end 
+6: begin note = A4; duration = QUARTER;   end //you
+7: begin note = SP; duration = EIGHTH;   end
+8: begin note = G4; duration = QUARTER;   end //up
+9: begin note = G4; duration = HALF;   end
+10: begin note = C4; duration = EIGHTH;   end //nev-
+11: begin note = D4; duration = EIGHTH;   end //er
+12: begin note = F4; duration = EIGHTH;   end //gon-
+13: begin note = D4; duration = EIGHTH;   end //na
+
+14: begin note = G4; duration = QUARTER;   end //let
+15: begin note = SP; duration = EIGHTH;   end
+16: begin note = G4; duration = QUARTER;   end //you
+17: begin note = SP; duration = EIGHTH;   end
+18: begin note = F4; duration = QUARTER;   end //down
+19: begin note = F4; duration = EIGHTH;   end //*tie*
+20: begin note = E4; duration = EIGHTH;   end 
+21: begin note = D4; duration = QUARTER;   end
+22: begin note = C4; duration = EIGHTH;   end //nev-
+23: begin note = D4; duration = EIGHTH;   end //er
+24: begin note = F4; duration = EIGHTH;   end //gon-
+25: begin note = D4; duration = EIGHTH;   end //na
+
+26: begin note = F4; duration = HALF;   end //run
+27: begin note = G4; duration = QUARTER;   end //a-
+28: begin note = E4; duration = QUARTER;   end //round
+29: begin note = E4; duration = EIGHTH;   end //*tie*
+30: begin note = D4; duration = EIGHTH;   end 
+31: begin note = C4; duration = HALF;   end 
+32: begin note = SP; duration = EIGHTH;   end 
+33: begin note = C4; duration = QUARTER;   end //and de-
+
+34: begin note = G4; duration = HALF;   end //sert
+35: begin note = F4; duration = WHOLE;   end //you
+36: begin note = C4; duration = EIGHTH;   end //nev-
+37: begin note = D4; duration = EIGHTH;   end //er
+38: begin note = F4; duration = EIGHTH;   end //gon-
+39: begin note = D4; duration = EIGHTH;   end //na
+
+40: begin note = A4; duration = QUARTER;   end //make
+41: begin note = SP; duration = EIGHTH;   end 
+42: begin note = A4; duration = QUARTER;   end //you
+43: begin note = SP; duration = EIGHTH;   end
+44: begin note = G4; duration = QUARTER;   end //cry
+45: begin note = G4; duration = HALF;   end
+46: begin note = C4; duration = EIGHTH;   end //nev-
+47: begin note = D4; duration = EIGHTH;   end //er
+48: begin note = F4; duration = EIGHTH;   end //gon-
+49: begin note = D4; duration = EIGHTH;   end //na
+
+50: begin note = C5; duration = HALF;   end //say
+51: begin note = E4; duration = QUARTER;   end //good
+52: begin note = F4; duration = QUARTER;   end //bye
+53: begin note = F4; duration = EIGHTH;   end //*tie*
+54: begin note = E4; duration = EIGHTH;   end //
+55: begin note = D4; duration = QUARTER;   end //
+56: begin note = C4; duration = EIGHTH;   end //nev-
+57: begin note = D4; duration = EIGHTH;   end //er
+58: begin note = F4; duration = EIGHTH;   end //gon-
+59: begin note = D4; duration = EIGHTH;   end //na
+
+60: begin note = F4; duration = HALF;   end //tell
+61: begin note = G4; duration = QUARTER;   end //a
+62: begin note = E4; duration = QUARTER;   end //lie
+63: begin note = E4; duration = EIGHTH;   end //*tie*
+64: begin note = D4; duration = EIGHTH;   end 
+65: begin note = C4; duration = HALF;   end 
+66: begin note = SP; duration = EIGHTH;   end 
+67: begin note = C4; duration = QUARTER;   end //and
+
+68: begin note = G4; duration = HALF;    end //hurt
+69: begin note = F4; duration = WHOLE;   end //you
+70: begin note = SP; duration = HALF;    end 
+
+default: 	begin note = SP; duration = QUARTER;  end
+endcase
+end
+endmodule
+
+module SongPlayer( input clock, input reset, input playSound, output reg audioOut, output wire aud_sd);
+reg [19:0] counter;
+reg [31:0] time1, noteTime;
+reg [9:0] msec, number;	//millisecond counter, and sequence number of musical note.
+wire [4:0] note, duration;
+wire [19:0] notePeriod;
+parameter clockFrequency = 100_000_000; 
+
+assign aud_sd = 1'b1;
+
+MusicSheet 	mysong(number, notePeriod, duration	);
+always @ (posedge clock) 
+  begin
+	if(reset | ~playSound) 
+ 		begin 
+          counter <=0;  
+          time1<=0;  
+          number <=0;  
+          audioOut <=1;	
+     	end
+else 
+begin
+		counter <= counter + 1; 
+time1<= time1+1;
+		if( counter >= notePeriod) 
+   begin
+			counter <=0;  
+			audioOut <= ~audioOut ; 
+   end	//toggle audio output 	
+		if( time1 >= noteTime) 
+begin	
+				time1 <=0;  
+number <= number + 1; 
+end  //play next note
+ if(number == 71) number <=0; // Make the number reset at the end of the song
+	end
+  end	
+         
+  always @(duration) noteTime = duration * clockFrequency / 8; 
+       //number of   FPGA clock periods in one note.
+endmodule
